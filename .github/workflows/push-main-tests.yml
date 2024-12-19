@@ -1,0 +1,39 @@
+name: Build, smoke test and audit
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Build and run docker compose
+        run: docker compose -p app up -d
+      - name: Wait for container
+        run: sleep 60s
+        shell: bash
+      - name: Run cypress end-to-end smoke tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          working-directory: ./e2e-tests
+          env: grepTags=@smoke
+      - name: Audit authentication pages using Lighthouse
+        uses: foo-software/lighthouse-check-action@master
+        id: lighthouseCheck
+        with:
+          urls: 'http://localhost/login,http://localhost/register'
+      - name: Verify Lighthouse check results
+        uses: foo-software/lighthouse-check-status-action@master
+        with:
+          lighthouseCheckResults:
+            ${{ steps.lighthouseCheck.outputs.lighthouseCheckResults }}
+          minSeoScore: '90'
+          minBestPracticesScore: '90'
+          minAccessibilityScore: '80'
+          minPerformanceScore: '60'
+          minProgressiveWebAppScore: '60'
